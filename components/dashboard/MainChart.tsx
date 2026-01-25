@@ -121,24 +121,41 @@ export function MainChart({ selectedSymbol, onSymbolChange }: MainChartProps) {
         return data;
     }, []);
 
-    // 분석 데이터 가져오기
+    // 분석 및 OHLCV 데이터 가져오기
     const fetchAnalysis = useCallback(async () => {
         setLoading(true);
         try {
-            const response = await api.analyze(activePair, activeTimeframe.toLowerCase());
-            if (response.success && response.data) {
-                setAnalysis(response.data);
-                
-                // Mock OHLCV 데이터 생성 (실제로는 API에서 가져와야 함)
-                const basePrice = response.data.current_price || 40000;
+            // 분석 데이터와 OHLCV 데이터를 병렬로 가져오기
+            const [analysisRes, ohlcvRes] = await Promise.all([
+                api.analyze(activePair, activeTimeframe.toLowerCase()),
+                api.getOHLCV(activePair, activeTimeframe.toLowerCase(), 200)
+            ]);
+            
+            if (analysisRes.success && analysisRes.data) {
+                setAnalysis(analysisRes.data);
+            }
+            
+            // 실제 OHLCV 데이터 사용
+            if (ohlcvRes.success && ohlcvRes.data?.ohlcv?.length > 0) {
+                const ohlcvData = ohlcvRes.data.ohlcv.map(d => ({
+                    time: d.time as Time,
+                    open: d.open,
+                    high: d.high,
+                    low: d.low,
+                    close: d.close,
+                }));
+                setChartData(ohlcvData);
+            } else {
+                // OHLCV 데이터 없으면 Mock 사용
+                const basePrice = analysisRes.data?.current_price || 100;
                 const mockData = generateMockOHLCV(activePair, basePrice);
                 setChartData(mockData);
             }
         } catch (error) {
-            console.error("Analysis fetch error:", error);
-            // 에러 시에도 mock 데이터 사용
+            console.error("Data fetch error:", error);
+            // 에러 시 mock 데이터 사용
             const basePrices: Record<string, number> = {
-                BTC: 42000, ETH: 2200, SOL: 100, XRP: 0.55, DOGE: 0.08, PEPE: 0.000001
+                BTC: 88000, ETH: 2900, SOL: 125, XRP: 0.55, DOGE: 0.08
             };
             const mockData = generateMockOHLCV(activePair, basePrices[activePair] || 100);
             setChartData(mockData);

@@ -234,6 +234,12 @@ export const api = {
     // 시장 지표
     getMarket: () => fetchApi<MarketMetrics>('/api/market'),
     getPrice: (symbol: string) => fetchApi<{ price: number; symbol: string }>(`/api/price/${symbol}`),
+    
+    // OHLCV 캔들 데이터
+    getOHLCV: (symbol: string, interval: string = '1h', limit: number = 200) => 
+        fetchApi<{ symbol: string; interval: string; ohlcv: OHLCVData[] }>(
+            `/api/ohlcv/${symbol}?interval=${interval}&limit=${limit}`
+        ),
 
     // 거래 실행
     executeSignal: (signal: {
