@@ -30,31 +30,19 @@ export function LogViewer({ compact = false }: LogViewerProps) {
 
         try {
             const res = await api.getLogs(100);
-            if (res.success && res.data) {
-                const backendLogs = res.data.map(log => ({
-                    timestamp: log.timestamp,
+            if (res.success && res.data && Array.isArray(res.data)) {
+                const backendLogs: LogEntry[] = res.data.map(log => ({
+                    timestamp: log.timestamp || "",
                     level: (log.level === "WARNING" ? "WARN" : log.level) as LogEntry['level'],
-                    message: log.message,
+                    message: log.message || "",
                     module: log.module
                 }));
                 
-                // 새 로그만 추가 (중복 방지)
-                setLogs(prev => {
-                    const existingTimestamps = new Set(prev.map(l => l.timestamp + l.message));
-                    const newLogs = backendLogs.filter(l => !existingTimestamps.has(l.timestamp + l.message));
-                    
-                    if (newLogs.length > 0) {
-                        // 합치고 시간순 정렬 후 최신 100개만 유지
-                        const combined = [...prev, ...newLogs]
-                            .sort((a, b) => a.timestamp.localeCompare(b.timestamp))
-                            .slice(-100);
-                        return combined;
-                    }
-                    return prev;
-                });
+                // 백엔드 로그로 덮어쓰기 (최신 100개)
+                setLogs(backendLogs.slice(-100));
             }
         } catch (error) {
-            // 에러 시 조용히 무시
+            console.error("로그 가져오기 오류:", error);
         }
     }, [isPaused]);
 
@@ -144,7 +132,7 @@ export function LogViewer({ compact = false }: LogViewerProps) {
     }, []);
 
     return (
-        <div className={cn("flex flex-col", compact ? "h-[300px]" : "h-full")}>
+        <div className={cn("flex flex-col bg-slate-900", compact ? "h-[350px]" : "h-full min-h-[400px]")}>
             {/* Header */}
             <div className="flex justify-between items-center px-4 py-2 border-b border-slate-800 bg-slate-900/50">
                 <h3 className="font-semibold text-slate-100 flex items-center gap-2">
@@ -209,25 +197,26 @@ export function LogViewer({ compact = false }: LogViewerProps) {
             {/* Logs */}
             <div
                 ref={scrollRef}
-                className="flex-1 p-3 overflow-y-auto font-mono text-xs space-y-0.5 bg-slate-950"
+                className="overflow-y-auto font-mono text-xs bg-slate-950"
+                style={{ height: compact ? "200px" : "300px" }}
             >
                 {filteredLogs.length === 0 ? (
-                    <div className="text-slate-500 text-center py-4">
-                        표시할 로그가 없습니다.
+                    <div className="text-slate-500 text-center py-8">
+                        <div className="animate-pulse">로그 로딩 중...</div>
+                        <div className="text-xs mt-2">버퍼: {logs.length}개</div>
                     </div>
                 ) : (
-                    filteredLogs.map((log, i) => (
-                        <div key={i} className="flex gap-2 hover:bg-slate-900/50 px-1 py-0.5 rounded">
-                            <span className="text-slate-600 flex-shrink-0">[{log.timestamp.split(' ')[1] || log.timestamp}]</span>
-                            <span className={cn("flex-shrink-0 w-14", getLogLevelClass(log.level))}>
-                                {log.level === "WARNING" ? "WARN" : log.level}
-                            </span>
-                            {log.module && (
-                                <span className="text-slate-600 flex-shrink-0">[{log.module}]</span>
-                            )}
-                            <span className="text-slate-300 break-all">{log.message}</span>
-                        </div>
-                    ))
+                    <div className="p-2 space-y-0.5">
+                        {filteredLogs.map((log, i) => (
+                            <div key={i} className="flex gap-2 hover:bg-slate-900/50 px-1 py-0.5 rounded text-[11px]">
+                                <span className="text-slate-600 shrink-0">[{log.timestamp.split(' ')[1] || log.timestamp}]</span>
+                                <span className={cn("shrink-0 w-12", getLogLevelClass(log.level))}>
+                                    {log.level === "WARNING" ? "WARN" : log.level}
+                                </span>
+                                <span className="text-slate-300 break-all truncate">{log.message}</span>
+                            </div>
+                        ))}
+                    </div>
                 )}
             </div>
         </div>

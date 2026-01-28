@@ -407,9 +407,6 @@ export const api = {
             body: JSON.stringify({ initial_balance: initialBalance }),
         }),
 
-    // 로그 API
-    getLogs: (limit: number = 200) => fetchApi<{ timestamp: string; level: string; message: string }[]>(`/api/logs?limit=${limit}`),
-
     // 시그널 생성 API
     createSignal: (params: {
         symbol: string;
