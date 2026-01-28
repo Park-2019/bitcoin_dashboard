@@ -10,6 +10,8 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5001';
 export interface HealthStatus {
     status: string;
     version: string;
+    strategy?: string;
+    exchange?: string;
     timestamp: string;
     auto_scan?: {
         enabled: boolean;
@@ -27,6 +29,19 @@ export interface HealthStatus {
     };
 }
 
+export interface WalletInfo {
+    initial_balance: number;
+    current_balance: number;
+    available_balance: number;
+    in_positions: number;
+    total_balance: number;
+    unrealized_pnl: number;
+    total_realized_pnl: number;
+    daily_pnl: number;
+    daily_trades: number;
+    total_return_percent: number;
+}
+
 export interface OKXStatus {
     connected: boolean;
     enabled: boolean;
@@ -37,11 +52,17 @@ export interface OKXStatus {
         used: number;
     };
     positions?: Position[];
+    wallet?: WalletInfo;
     stats?: {
         daily_pnl: number;
         daily_trades: number;
         total_pnl: number;
+        total_realized_pnl: number;
+        unrealized_pnl: number;
         win_rate: number;
+        total_return_percent: number;
+        best_trade: number;
+        worst_trade: number;
     };
 }
 
@@ -56,6 +77,80 @@ export interface Position {
     leverage: number;
     margin: number;
     liq_price: number;
+    source?: 'okx' | 'quant_bot';
+    entry_score?: number;      // 시그널 진입 점수
+    market_phase?: string;      // 시장 단계
+}
+
+export interface SpotAsset {
+    currency: string;
+    total: number;
+    available: number;
+    frozen: number;
+    usd_value: number;
+}
+
+export interface CombinedPosition {
+    symbol: string;
+    direction: 'long' | 'short';
+    entry_price: number;
+    current_price: number;
+    pnl_percent: number;
+    position_usdt: number;
+    unrealized_pnl: number;
+    stop_loss: number;
+    take_profit: number;
+    confidence: number;
+    source: 'okx' | 'quant_bot';
+    created_at?: string;
+    leverage?: number;
+    liq_price?: number;
+}
+
+export interface CombinedPortfolio {
+    summary: {
+        total_positions: number;
+        virtual_positions: number;
+        okx_positions: number;
+        okx_connected: boolean;
+    };
+    pnl: {
+        virtual_unrealized: number;
+        virtual_realized: number;
+        okx_unrealized: number;
+        combined_unrealized: number;
+    };
+    wallet: {
+        virtual: WalletInfo;
+        okx: {
+            total_usdt: number;
+            free_usdt: number;
+            used_usdt: number;
+        };
+    };
+    spot_assets: SpotAsset[];
+    positions: CombinedPosition[];
+}
+
+export interface QueueStatus {
+    queue_size: number;
+    max_queue_size: number;
+    total_queued: number;
+    total_executed: number;
+    total_expired: number;
+    top_signals: {
+        symbol: string;
+        confidence: number;
+        priority: number;
+    }[];
+    dynamic_info?: {
+        total_balance: number;
+        optimal_positions: number;
+        current_positions: number;
+        available_slots: number;
+        position_size_usdt: number;
+        auto_trade_enabled: boolean;
+    };
 }
 
 export interface Signal {
@@ -72,7 +167,15 @@ export interface Signal {
     market_phase: string;
     entry_reason: string;
     created_at: string;
-    updated_at: string;
+    updated_at?: string;
+    closed_at?: string;
+    // 포지션 관련 필드
+    position_size?: number;      // 포지션 수량
+    position_usdt?: number;      // 포지션 금액 (USDT)
+    unrealized_pnl?: number;     // 미실현 손익
+    realized_pnl?: number;       // 실현 손익
+    final_pnl?: number;          // 최종 손익률
+    source?: 'okx' | 'quant_bot';  // 출처
 }
 
 export interface AnalysisResult {
@@ -295,6 +398,198 @@ export const api = {
         }),
 
     testNotify: () => fetchApi<{ success: boolean }>('/api/notify/test', { method: 'POST' }),
+
+    // 지갑 API
+    getWallet: () => fetchApi<WalletInfo>('/api/wallet'),
+    resetWallet: (initialBalance: number = 10000) =>
+        fetchApi<{ success: boolean; message: string }>('/api/wallet/reset', {
+            method: 'POST',
+            body: JSON.stringify({ initial_balance: initialBalance }),
+        }),
+
+    // 로그 API
+    getLogs: (limit: number = 200) => fetchApi<{ timestamp: string; level: string; message: string }[]>(`/api/logs?limit=${limit}`),
+
+    // 시그널 생성 API
+    createSignal: (params: {
+        symbol: string;
+        direction: 'long' | 'short';
+        entry_price: number;
+        confidence: number;
+    }) => fetchApi<{ success: boolean; signal_id: string }>('/api/signals/create', {
+        method: 'POST',
+        body: JSON.stringify(params),
+    }),
+
+    // OKX 실거래 API
+    getOKXFullStatus: () => fetchApi<OKXFullStatus>('/api/okx/full-status'),
+    
+    enableAutoTrade: (enabled: boolean) => 
+        fetchApi<{ success: boolean; auto_trade_enabled: boolean; message: string }>('/api/okx/enable-auto-trade', {
+            method: 'POST',
+            body: JSON.stringify({ enabled }),
+        }),
+    
+    // 현물 자산 조회
+    getSpotAssets: () => fetchApi<SpotAsset[]>('/api/okx/spot-assets'),
+    
+    // OKX 포지션 동기화
+    syncOKXPositions: () => 
+        fetchApi<{ success: boolean; synced: number; skipped: number; message: string }>('/api/okx/sync-positions', {
+            method: 'POST',
+        }),
+    
+    // OKX 포트폴리오
+    getOKXPortfolio: () => fetchApi<{
+        balance: { total_usdt: number; free_usdt: number; used_usdt: number };
+        spot_assets: { count: number; total_usd_value: number; assets: SpotAsset[] };
+        futures_positions: { 
+            count: number; 
+            total_value: number; 
+            unrealized_pnl: number; 
+            positions: Position[] 
+        };
+    }>('/api/okx/portfolio'),
+    
+    // 통합 포트폴리오 (가상 + OKX)
+    getCombinedPortfolio: () => fetchApi<CombinedPortfolio>('/api/portfolio/combined'),
+    
+    // 시그널 대기 큐
+    getQueueStatus: () => fetchApi<QueueStatus>('/api/queue/status'),
+    clearQueue: () => fetchApi<{ success: boolean; message: string }>('/api/queue/clear', { method: 'POST' }),
+    processQueue: () => fetchApi<{ success: boolean; executed: number; message: string }>('/api/queue/process', { method: 'POST' }),
+
+    // 포트폴리오 상태 (자동매매 대시보드용)
+    getPortfolioStatus: () => fetchApi<PortfolioStatus>('/api/okx/portfolio-status'),
+    
+    // 잔고 최적화
+    optimizeBalance: () => fetchApi<{
+        total_equity: number;
+        available_usdt: number;
+        can_trade: boolean;
+        transfer_made: boolean;
+    }>('/api/okx/optimize-balance', { method: 'POST' }),
+
+    // 봇 상태 조회
+    getBotStatus: () => fetchApi<{
+        bot_enabled: boolean;
+        okx_connected: boolean;
+        auto_trade_enabled: boolean;
+        positions_count: number;
+        okx_symbols_count: number;
+    }>('/api/bot/status'),
+    
+    // 봇 On/Off 토글
+    toggleBot: (enabled?: boolean) => fetchApi<{
+        bot_enabled: boolean;
+        message: string;
+    }>('/api/bot/toggle', {
+        method: 'POST',
+        body: JSON.stringify(enabled !== undefined ? { enabled } : {}),
+    }),
+    
+    // OKX 지원 심볼 목록
+    getOKXSymbols: () => fetchApi<{
+        count: number;
+        symbols: Record<string, string>;
+    }>('/api/okx/supported-symbols'),
+
+    // 계좌 간 자금 이체
+    transferFunds: (currency: string, amount: number, fromAccount: string, toAccount: string) =>
+        fetchApi<{ success: boolean; transfer_id?: string; amount?: number }>('/api/okx/transfer-funds', {
+            method: 'POST',
+            body: JSON.stringify({ currency, amount, from_account: fromAccount, to_account: toAccount }),
+        }),
+
+    // 모든 OKX 계좌 잔고
+    getAllBalances: () => fetchApi<{
+        trading: { total_usdt: number; free_usdt: number; used_usdt: number };
+        funding: { usdt: number; assets: any[] };
+        spot_assets: any[];
+        total_usdt: number;
+        summary: { trading_total: number; trading_available: number; funding_usdt: number };
+    }>('/api/okx/all-balances'),
 };
+
+// 포트폴리오 상태 인터페이스
+export interface PortfolioStatus {
+    connected: boolean;
+    is_demo: boolean;
+    auto_trade_enabled: boolean;
+    can_trade: boolean;
+    balance: {
+        total: number;
+        available: number;
+        in_positions: number;
+        spot_usdt: number;
+        funding_usdt: number;
+    };
+    positions: {
+        count: number;
+        value: number;
+        unrealized_pnl: number;
+        details?: any[];
+    };
+    holdings: {
+        count: number;
+        total_value: number;
+        details: Array<{
+            currency: string;
+            total: number;
+            available: number;
+            usd_value: number;
+            frozen: number;
+        }>;
+    };
+    trading_config: {
+        leverage: number;
+        position_size_percent: number;
+        max_positions: number;
+        min_confidence: number;
+    };
+}
+
+// OKX 전체 상태 인터페이스
+export interface OKXFullStatus {
+    connected: boolean;
+    enabled: boolean;
+    auto_trade: boolean;
+    auto_trade_enabled: boolean;
+    is_demo: boolean;
+    balance: {
+        total_usdt: number;
+        free_usdt: number;
+        used_usdt: number;
+    };
+    positions: {
+        symbol: string;
+        side: string;
+        size: number;
+        notional_usd: number;
+        entry_price: number;
+        mark_price: number;
+        pnl: number;
+        pnl_percent: number;
+        leverage: string;
+    }[];
+    stats: {
+        daily_trades: number;
+        daily_pnl: number;
+        total_trades: number;
+        total_pnl: number;
+        winning_trades: number;
+        losing_trades: number;
+        positions_count: number;
+        unrealized_pnl: number;
+    };
+    config: {
+        leverage: number;
+        position_size_percent: number;
+        max_positions: number;
+        min_confidence: number;
+    };
+    position_size_percent: number;
+    max_position_size_usdt: number;
+}
 
 export default api;

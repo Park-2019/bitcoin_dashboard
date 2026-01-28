@@ -65,7 +65,7 @@ export function LogViewer() {
             if (statsRes.success && statsRes.data) {
                 const stats = statsRes.data;
                 if (stats.active_signals > 0) {
-                    addLog("DEBUG", `활성 시그널: ${stats.active_signals}, 승률: ${stats.win_rate.toFixed(1)}%`);
+                    addLog("DEBUG", `활성 포지션: ${stats.active_signals}, 승률: ${stats.win_rate.toFixed(1)}%`);
                 }
             }
 

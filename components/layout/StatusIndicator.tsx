@@ -73,7 +73,8 @@ export function StatusIndicator({ onStatusChange }: StatusIndicatorProps) {
 
     const botStatus = okxStatus?.connected ? "running" : okxStatus ? "stopped" : "error";
     const mode = okxStatus?.is_demo ? "dry_run" : "live";
-    const strategy = "VCP_Swing_v3";
+    const strategy = healthStatus?.strategy || "퀀트 전략";
+    const exchange = healthStatus?.exchange || "OKX";
     const version = healthStatus?.version || "2.0";
 
     return (
@@ -126,7 +127,7 @@ export function StatusIndicator({ onStatusChange }: StatusIndicatorProps) {
             {/* Exchange Info */}
             <div className="flex items-center gap-1 text-[10px] text-slate-400 flex-shrink-0">
                 <Zap className="w-2.5 h-2.5 text-amber-500" />
-                <span className="font-medium text-slate-300">OKX</span>
+                <span className="font-medium text-slate-300">{exchange}</span>
             </div>
 
             <div className="h-4 w-px bg-slate-800 mx-2 flex-shrink-0" />

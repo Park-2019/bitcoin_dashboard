@@ -113,39 +113,43 @@ export function SummaryCards({ okxStatus }: SummaryCardsProps) {
 
     // 데이터 계산
     const balance = okxStatus?.balance;
-    const dailyPnl = okxStatus?.stats?.daily_pnl || 0;
-    const totalPnl = stats?.total_pnl || okxStatus?.stats?.total_pnl || 0;
+    const wallet = okxStatus?.wallet;
+    const dailyPnl = wallet?.daily_pnl || okxStatus?.stats?.daily_pnl || 0;
+    const totalReturnPercent = okxStatus?.stats?.total_return_percent || 0;
+    const totalRealizedPnl = wallet?.total_realized_pnl || 0;
+    const unrealizedPnl = wallet?.unrealized_pnl || 0;
     const winRate = stats?.win_rate || okxStatus?.stats?.win_rate || 0;
     const activeCount = stats?.active_signals || 0;
-    const dailyTrades = okxStatus?.stats?.daily_trades || 0;
+    const dailyTrades = wallet?.daily_trades || okxStatus?.stats?.daily_trades || 0;
+    const bestTrade = okxStatus?.stats?.best_trade || stats?.best_trade || 0;
 
     const metrics = [
         {
             label: "총 수익률",
-            value: totalPnl >= 0 ? `+${totalPnl.toFixed(2)}%` : `${totalPnl.toFixed(2)}%`,
-            subValue: `승률 ${winRate.toFixed(1)}%`,
-            trend: totalPnl >= 0 ? "up" as const : "down" as const,
+            value: totalReturnPercent >= 0 ? `+${totalReturnPercent.toFixed(2)}%` : `${totalReturnPercent.toFixed(2)}%`,
+            subValue: `실현 $${totalRealizedPnl.toFixed(0)} | 미실현 $${unrealizedPnl.toFixed(0)}`,
+            trend: totalReturnPercent >= 0 ? "up" as const : "down" as const,
             icon: TrendingUp,
         },
         {
             label: "일일 손익",
-            value: dailyPnl >= 0 ? `+${dailyPnl.toFixed(2)}` : `${dailyPnl.toFixed(2)}`,
+            value: dailyPnl >= 0 ? `+$${dailyPnl.toFixed(2)}` : `$${dailyPnl.toFixed(2)}`,
             subValue: `${dailyTrades}건 거래`,
             trend: dailyPnl >= 0 ? "up" as const : "down" as const,
             icon: dailyPnl >= 0 ? TrendingUp : TrendingDown,
         },
         {
-            label: "활성 시그널",
+            label: "활성 포지션",
             value: String(activeCount),
             subValue: `손절 ${stats?.sl_hit || 0} | 익절 ${stats?.tp_hit || 0}`,
             trend: "neutral" as const,
             icon: Crosshair,
         },
         {
-            label: "잔고 (USDT)",
-            value: balance ? `$${balance.total.toLocaleString()}` : "--",
-            subValue: balance ? `$${balance.available.toLocaleString()} 사용가능` : "연결 대기중",
-            trend: "neutral" as const,
+            label: "총 자산",
+            value: balance ? `$${balance.total.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : "--",
+            subValue: balance ? `사용가능 $${balance.available.toLocaleString(undefined, {minimumFractionDigits: 0})}` : "연결 대기중",
+            trend: totalReturnPercent >= 0 ? "up" as const : "down" as const,
             icon: Wallet,
         },
     ];
@@ -163,7 +167,7 @@ export function SummaryCards({ okxStatus }: SummaryCardsProps) {
         },
         { 
             label: "최고 거래", 
-            value: stats?.best_trade ? `+${stats.best_trade.toFixed(2)}%` : "--", 
+            value: bestTrade > 0 ? `+${bestTrade.toFixed(2)}%` : "--", 
             trend: "up" as const 
         },
         { 
@@ -184,22 +188,25 @@ export function SummaryCards({ okxStatus }: SummaryCardsProps) {
     ];
 
     return (
-        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-2">
-            {metrics.map((metric) => (
-                <SummaryCard 
-                    key={metric.label} 
-                    {...metric} 
-                    loading={loading}
-                />
-            ))}
+        <div className="space-y-3">
+            {/* Main Metrics - 4 cards */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+                {metrics.map((metric) => (
+                    <SummaryCard 
+                        key={metric.label} 
+                        {...metric} 
+                        loading={loading}
+                    />
+                ))}
+            </div>
 
-            {/* Secondary Stats Card - spans remaining columns */}
-            <div className="bg-slate-900 border border-slate-800 rounded-lg p-3 col-span-2">
+            {/* Secondary Stats Card */}
+            <div className="bg-slate-900 border border-slate-800 rounded-lg p-3">
                 <div className="flex items-center justify-between mb-2">
                     <h3 className="text-sm font-semibold text-slate-100">보조 통계</h3>
                     {loading && <RefreshCw className="w-3 h-3 text-slate-500 animate-spin" />}
                 </div>
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                <div className="grid grid-cols-3 md:grid-cols-6 gap-x-4 gap-y-1 text-xs">
                     {secondaryStats.map((stat) => (
                         <SecondaryStat key={stat.label} {...stat} />
                     ))}
