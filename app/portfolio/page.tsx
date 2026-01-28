@@ -320,19 +320,22 @@ export default function PortfolioPage() {
                     </div>
                 </div>
 
-                {/* 차트 섹션 */}
+                {/* 차트 섹션 - 스크롤 시 상단 고정 */}
                 {selectedSymbol && (
-                    <div className="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden">
-                        <div className="px-5 py-3 border-b border-slate-800 flex items-center justify-between">
+                    <div className="sticky top-0 z-40 bg-slate-900 border border-slate-800 rounded-lg overflow-hidden shadow-2xl">
+                        <div className="px-5 py-3 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 backdrop-blur-sm">
                             <h3 className="text-lg font-semibold text-slate-100 flex items-center gap-2">
                                 <LineChart className="w-5 h-5 text-green-400" />
                                 {selectedSymbol} 차트
+                                <span className="text-xs px-2 py-0.5 bg-green-500/20 text-green-400 rounded">
+                                    고정됨
+                                </span>
                             </h3>
                             <button
                                 onClick={() => setSelectedSymbol(null)}
-                                className="text-xs px-2 py-1 bg-slate-700 hover:bg-slate-600 text-slate-400 rounded transition-colors"
+                                className="text-xs px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded transition-colors flex items-center gap-1"
                             >
-                                닫기
+                                ✕ 닫기
                             </button>
                         </div>
                         <MainChart 
