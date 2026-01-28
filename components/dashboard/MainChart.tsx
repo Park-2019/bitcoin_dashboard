@@ -13,12 +13,22 @@ interface Indicator {
     enabled: boolean;
 }
 
+interface PositionInfo {
+    entry_price: number;
+    stop_loss?: number;
+    take_profit?: number;
+    side?: "long" | "short";
+    pnl_percent?: number;
+}
+
 interface MainChartProps {
     selectedSymbol?: string;
     onSymbolChange?: (symbol: string) => void;
+    positionInfo?: PositionInfo;
+    compact?: boolean;  // 컴팩트 모드 (포트폴리오용)
 }
 
-export function MainChart({ selectedSymbol, onSymbolChange }: MainChartProps) {
+export function MainChart({ selectedSymbol, onSymbolChange, positionInfo, compact = false }: MainChartProps) {
     const chartContainerRef = useRef<HTMLDivElement>(null);
     const chartRef = useRef<IChartApi | null>(null);
     const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
@@ -27,6 +37,10 @@ export function MainChart({ selectedSymbol, onSymbolChange }: MainChartProps) {
     const bbUpperSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
     const bbMiddleSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
     const bbLowerSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+    const priceLinesRef = useRef<any[]>([]);
+    
+    // 차트 높이 설정
+    const chartHeight = compact ? 250 : 350;
 
     const [indicators, setIndicators] = useState<Indicator[]>([
         { id: "sma20", name: "MA20", color: "#22c55e", enabled: true },
@@ -178,7 +192,7 @@ export function MainChart({ selectedSymbol, onSymbolChange }: MainChartProps) {
                 horzLines: { color: "#1e293b" },
             },
             width: chartContainerRef.current.clientWidth,
-            height: 350,
+            height: chartHeight,
             timeScale: {
                 timeVisible: true,
                 secondsVisible: false,
@@ -269,6 +283,67 @@ export function MainChart({ selectedSymbol, onSymbolChange }: MainChartProps) {
 
         chartRef.current?.timeScale().fitContent();
     }, [chartData, indicators]);
+
+    // 포지션 정보 Price Lines 업데이트
+    useEffect(() => {
+        if (!candleSeriesRef.current || !positionInfo) return;
+
+        // 기존 price lines 제거
+        priceLinesRef.current.forEach(line => {
+            try {
+                candleSeriesRef.current?.removePriceLine(line);
+            } catch (e) {}
+        });
+        priceLinesRef.current = [];
+
+        // 진입가 라인 (노란색)
+        if (positionInfo.entry_price) {
+            const entryLine = candleSeriesRef.current.createPriceLine({
+                price: positionInfo.entry_price,
+                color: "#eab308",
+                lineWidth: 2,
+                lineStyle: 0, // Solid
+                axisLabelVisible: true,
+                title: `진입 $${positionInfo.entry_price.toFixed(4)}`,
+            });
+            priceLinesRef.current.push(entryLine);
+        }
+
+        // 손절가 라인 (빨간색)
+        if (positionInfo.stop_loss) {
+            const slLine = candleSeriesRef.current.createPriceLine({
+                price: positionInfo.stop_loss,
+                color: "#ef4444",
+                lineWidth: 2,
+                lineStyle: 2, // Dashed
+                axisLabelVisible: true,
+                title: `SL $${positionInfo.stop_loss.toFixed(4)}`,
+            });
+            priceLinesRef.current.push(slLine);
+        }
+
+        // 익절가 라인 (녹색)
+        if (positionInfo.take_profit) {
+            const tpLine = candleSeriesRef.current.createPriceLine({
+                price: positionInfo.take_profit,
+                color: "#22c55e",
+                lineWidth: 2,
+                lineStyle: 2, // Dashed
+                axisLabelVisible: true,
+                title: `TP $${positionInfo.take_profit.toFixed(4)}`,
+            });
+            priceLinesRef.current.push(tpLine);
+        }
+
+        return () => {
+            priceLinesRef.current.forEach(line => {
+                try {
+                    candleSeriesRef.current?.removePriceLine(line);
+                } catch (e) {}
+            });
+            priceLinesRef.current = [];
+        };
+    }, [positionInfo, chartData]);
 
     // 심볼/타임프레임 변경 시 데이터 가져오기
     useEffect(() => {
@@ -411,10 +486,27 @@ export function MainChart({ selectedSymbol, onSymbolChange }: MainChartProps) {
             )}
 
             {/* Chart */}
-            <div ref={chartContainerRef} className="w-full h-[350px]" />
+            <div ref={chartContainerRef} className={cn("w-full", compact ? "h-[250px]" : "h-[350px]")} />
 
             {/* Legend */}
             <div className="flex items-center justify-center gap-3 px-3 py-1 border-t border-slate-800 text-[10px]">
+                {positionInfo && (
+                    <>
+                        <div className="flex items-center gap-1">
+                            <div className="w-3 h-0.5 bg-yellow-500 rounded" />
+                            <span className="text-yellow-500">진입</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                            <div className="w-3 h-0.5 bg-red-500 rounded border-dashed" />
+                            <span className="text-red-400">SL</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                            <div className="w-3 h-0.5 bg-green-500 rounded border-dashed" />
+                            <span className="text-green-400">TP</span>
+                        </div>
+                        <div className="text-slate-700">|</div>
+                    </>
+                )}
                 <div className="flex items-center gap-1">
                     <div className="w-0 h-0 border-l-[4px] border-r-[4px] border-b-[6px] border-l-transparent border-r-transparent border-b-green-500" />
                     <span className="text-slate-500">매수</span>

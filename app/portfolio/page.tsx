@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { MainChart } from "@/components/dashboard/MainChart";
 import { api, Position } from "@/lib/api";
@@ -170,6 +170,34 @@ export default function PortfolioPage() {
         losing: positions.filter(p => p.pnl < 0).length,
     };
 
+    // 선택된 포지션 정보 (차트에 표시할 진입가, SL, TP)
+    const selectedPosition = useMemo(() => {
+        if (!selectedSymbol) return null;
+        const pos = positions.find(p => {
+            const symbol = p.symbol.replace('-USDT-SWAP', '');
+            return symbol === selectedSymbol;
+        });
+        if (!pos) return null;
+        
+        // SL/TP 계산 (진입가 기준 -3% SL, +6% TP)
+        const slPercent = 0.03;
+        const tpPercent = 0.06;
+        const stopLoss = pos.side === 'long' 
+            ? pos.entry_price * (1 - slPercent)
+            : pos.entry_price * (1 + slPercent);
+        const takeProfit = pos.side === 'long'
+            ? pos.entry_price * (1 + tpPercent)
+            : pos.entry_price * (1 - tpPercent);
+
+        return {
+            entry_price: pos.entry_price,
+            stop_loss: stopLoss,
+            take_profit: takeProfit,
+            side: pos.side,
+            pnl_percent: pos.pnl_percent,
+        };
+    }, [selectedSymbol, positions]);
+
     // 색상 팔레트
     const colors = [
         "bg-cyan-500", "bg-green-500", "bg-amber-500", "bg-purple-500", 
@@ -323,24 +351,47 @@ export default function PortfolioPage() {
                 {/* 차트 섹션 - 스크롤 시 상단 고정 */}
                 {selectedSymbol && (
                     <div className="sticky top-0 z-40 bg-slate-900 border border-slate-800 rounded-lg overflow-hidden shadow-2xl">
-                        <div className="px-5 py-3 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 backdrop-blur-sm">
-                            <h3 className="text-lg font-semibold text-slate-100 flex items-center gap-2">
-                                <LineChart className="w-5 h-5 text-green-400" />
-                                {selectedSymbol} 차트
-                                <span className="text-xs px-2 py-0.5 bg-green-500/20 text-green-400 rounded">
-                                    고정됨
-                                </span>
-                            </h3>
+                        <div className="px-4 py-2 border-b border-slate-800 flex items-center justify-between bg-slate-900/95 backdrop-blur-sm">
+                            <div className="flex items-center gap-4">
+                                <h3 className="text-base font-semibold text-slate-100 flex items-center gap-2">
+                                    <LineChart className="w-4 h-4 text-green-400" />
+                                    {selectedSymbol}
+                                </h3>
+                                {selectedPosition && (
+                                    <div className="flex items-center gap-3 text-xs">
+                                        <span className="text-yellow-400 font-mono">
+                                            진입 ${selectedPosition.entry_price.toFixed(4)}
+                                        </span>
+                                        <span className="text-red-400 font-mono">
+                                            SL ${selectedPosition.stop_loss?.toFixed(4)}
+                                        </span>
+                                        <span className="text-green-400 font-mono">
+                                            TP ${selectedPosition.take_profit?.toFixed(4)}
+                                        </span>
+                                        <span className={cn(
+                                            "font-bold px-2 py-0.5 rounded",
+                                            (selectedPosition.pnl_percent ?? 0) >= 0 
+                                                ? "bg-green-500/20 text-green-400" 
+                                                : "bg-red-500/20 text-red-400"
+                                        )}>
+                                            {(selectedPosition.pnl_percent ?? 0) >= 0 ? "+" : ""}
+                                            {selectedPosition.pnl_percent?.toFixed(2)}%
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
                             <button
                                 onClick={() => setSelectedSymbol(null)}
-                                className="text-xs px-3 py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded transition-colors flex items-center gap-1"
+                                className="text-xs px-2 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded transition-colors"
                             >
-                                ✕ 닫기
+                                ✕
                             </button>
                         </div>
                         <MainChart 
                             selectedSymbol={selectedSymbol} 
                             onSymbolChange={(symbol) => setSelectedSymbol(symbol)}
+                            positionInfo={selectedPosition || undefined}
+                            compact={true}
                         />
                     </div>
                 )}
