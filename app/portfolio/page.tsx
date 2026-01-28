@@ -2,13 +2,14 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { MainChart } from "@/components/dashboard/MainChart";
 import { api, Position } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import {
     Wallet, RefreshCw, PieChart, TrendingUp, TrendingDown,
     DollarSign, BarChart3, ArrowUpRight, ArrowDownRight,
     Activity, Shield, Zap, CheckCircle, XCircle, AlertCircle,
-    Settings, ExternalLink
+    Settings, ExternalLink, LineChart
 } from "lucide-react";
 
 interface OKXPortfolio {
@@ -60,6 +61,9 @@ export default function PortfolioPage() {
     const [positions, setPositions] = useState<Position[]>([]);
     const [botStatus, setBotStatus] = useState<BotStatus | null>(null);
     const [loading, setLoading] = useState(true);
+    
+    // 차트 선택 심볼
+    const [selectedSymbol, setSelectedSymbol] = useState<string | null>(null);
     
     // 설정 편집 상태
     const [editMode, setEditMode] = useState(false);
@@ -316,6 +320,28 @@ export default function PortfolioPage() {
                     </div>
                 </div>
 
+                {/* 차트 섹션 */}
+                {selectedSymbol && (
+                    <div className="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden">
+                        <div className="px-5 py-3 border-b border-slate-800 flex items-center justify-between">
+                            <h3 className="text-lg font-semibold text-slate-100 flex items-center gap-2">
+                                <LineChart className="w-5 h-5 text-green-400" />
+                                {selectedSymbol} 차트
+                            </h3>
+                            <button
+                                onClick={() => setSelectedSymbol(null)}
+                                className="text-xs px-2 py-1 bg-slate-700 hover:bg-slate-600 text-slate-400 rounded transition-colors"
+                            >
+                                닫기
+                            </button>
+                        </div>
+                        <MainChart 
+                            selectedSymbol={selectedSymbol} 
+                            onSymbolChange={(symbol) => setSelectedSymbol(symbol)}
+                        />
+                    </div>
+                )}
+
                 {/* 포지션 & 통계 */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* 실거래 포지션 목록 */}
@@ -349,6 +375,28 @@ export default function PortfolioPage() {
                                 <Activity className="w-12 h-12 mx-auto mb-3 text-slate-700" />
                                 <p className="text-lg">활성 포지션이 없습니다</p>
                                 <p className="text-sm text-slate-600 mt-1">봇이 시그널을 감지하면 자동으로 진입합니다</p>
+                                
+                                {/* 빠른 차트 보기 */}
+                                <div className="mt-6 pt-6 border-t border-slate-800">
+                                    <p className="text-sm text-slate-500 mb-3">차트 빠른 보기</p>
+                                    <div className="flex flex-wrap justify-center gap-2">
+                                        {["BTC", "ETH", "SOL", "XRP", "DOGE", "AVAX"].map(symbol => (
+                                            <button
+                                                key={symbol}
+                                                onClick={() => setSelectedSymbol(symbol)}
+                                                className={cn(
+                                                    "px-3 py-1.5 text-sm rounded-lg border transition-colors",
+                                                    selectedSymbol === symbol 
+                                                        ? "bg-green-500/20 border-green-500/50 text-green-400"
+                                                        : "bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700"
+                                                )}
+                                            >
+                                                <LineChart className="w-3 h-3 inline mr-1" />
+                                                {symbol}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
                         ) : (
                             <div className="overflow-x-auto">
@@ -372,15 +420,21 @@ export default function PortfolioPage() {
                                             const symbol = pos.symbol.replace('-USDT-SWAP', '');
                                             
                                             return (
-                                                <tr key={pos.symbol} className={cn(
-                                                    "hover:bg-slate-800/50 transition-colors",
-                                                    isProfit ? "bg-green-500/5" : pos.pnl < 0 ? "bg-red-500/5" : ""
-                                                )}>
+                                                <tr 
+                                                    key={pos.symbol} 
+                                                    className={cn(
+                                                        "hover:bg-slate-800/50 transition-colors cursor-pointer",
+                                                        isProfit ? "bg-green-500/5" : pos.pnl < 0 ? "bg-red-500/5" : "",
+                                                        selectedSymbol === symbol && "ring-1 ring-green-500/50 bg-green-500/10"
+                                                    )}
+                                                    onClick={() => setSelectedSymbol(symbol)}
+                                                >
                                                     <td className="px-4 py-3">
                                                         <div className="flex items-center gap-2">
                                                             <div className={cn("w-2 h-2 rounded-full", colors[idx % colors.length])} />
-                                                            <span className="font-bold text-white">{symbol}</span>
+                                                            <span className="font-bold text-white hover:text-green-400 transition-colors">{symbol}</span>
                                                             <span className="text-xs text-slate-500">{pos.leverage}x</span>
+                                                            <LineChart className="w-3 h-3 text-slate-600" />
                                                         </div>
                                                     </td>
                                                     <td className="px-3 py-3 text-center">
