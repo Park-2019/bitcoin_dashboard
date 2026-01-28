@@ -9,8 +9,9 @@ import {
     Wallet, RefreshCw, PieChart, TrendingUp, TrendingDown,
     DollarSign, BarChart3, ArrowUpRight, ArrowDownRight,
     Activity, Shield, Zap, CheckCircle, XCircle, AlertCircle,
-    Settings, ExternalLink, LineChart
+    Settings, ExternalLink, LineChart, Server
 } from "lucide-react";
+import { LogViewer } from "@/components/dashboard/LogViewer";
 
 interface OKXPortfolio {
     connected: boolean;
@@ -800,6 +801,11 @@ export default function PortfolioPage() {
                                 </a>
                             )}
                         </div>
+                    </div>
+                    
+                    {/* 시스템 로그 */}
+                    <div className="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden">
+                        <LogViewer compact={true} />
                     </div>
                 </div>
             </div>

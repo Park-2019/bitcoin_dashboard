@@ -2,111 +2,87 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import { cn } from "@/lib/utils";
-import { api, Signal } from "@/lib/api";
-import { Play, Pause, Trash2, Download, RefreshCw } from "lucide-react";
+import { api, Signal, LogEntry as ApiLogEntry } from "@/lib/api";
+import { Play, Pause, Trash2, Download, RefreshCw, Server } from "lucide-react";
 
 interface LogEntry {
     timestamp: string;
-    level: "INFO" | "WARN" | "ERROR" | "SUCCESS" | "DEBUG" | "SIGNAL";
+    level: "INFO" | "WARN" | "ERROR" | "SUCCESS" | "DEBUG" | "SIGNAL" | "WARNING";
     message: string;
     data?: any;
+    module?: string;
 }
 
-export function LogViewer() {
+interface LogViewerProps {
+    compact?: boolean;  // 컴팩트 모드 (포트폴리오 페이지용)
+}
+
+export function LogViewer({ compact = false }: LogViewerProps) {
     const scrollRef = useRef<HTMLDivElement>(null);
     const [logs, setLogs] = useState<LogEntry[]>([]);
     const [isPaused, setIsPaused] = useState(false);
     const [filterLevel, setFilterLevel] = useState<LogEntry['level'] | 'ALL'>('ALL');
-    const [lastSignalIds, setLastSignalIds] = useState<Set<string>>(new Set());
+    const [lastLogTimestamp, setLastLogTimestamp] = useState<string>("");
 
-    // 시그널 변화 감지 및 로그 생성
-    const checkForUpdates = useCallback(async () => {
+    // 백엔드 로그 가져오기
+    const fetchBackendLogs = useCallback(async () => {
         if (isPaused) return;
 
         try {
-            // 헬스 체크
-            const healthRes = await api.health();
-            if (healthRes.success && healthRes.data) {
-                const health = healthRes.data;
+            const res = await api.getLogs(100);
+            if (res.success && res.data) {
+                const backendLogs = res.data.map(log => ({
+                    timestamp: log.timestamp,
+                    level: (log.level === "WARNING" ? "WARN" : log.level) as LogEntry['level'],
+                    message: log.message,
+                    module: log.module
+                }));
                 
-                // 자동 스캔 상태 로그
-                if (health.auto_scan?.last_scan_at) {
-                    addLog("INFO", `자동 스캔 완료 (top ${health.auto_scan.top_n}, min ${health.auto_scan.min_score}%)`);
-                }
-                if (health.auto_scan?.last_error) {
-                    addLog("ERROR", `스캔 오류: ${health.auto_scan.last_error}`);
-                }
-            }
-
-            // 시그널 변화 감지
-            const signalsRes = await api.getSignals();
-            if (signalsRes.success && signalsRes.data) {
-                const currentIds = new Set(signalsRes.data.map(s => s.id));
-                
-                // 새 시그널 감지
-                signalsRes.data.forEach(signal => {
-                    if (!lastSignalIds.has(signal.id)) {
-                        addLog("SIGNAL", `🎯 새 시그널: ${signal.symbol} ${signal.direction.toUpperCase()} (${signal.confidence.toFixed(0)}%)`, signal);
+                // 새 로그만 추가 (중복 방지)
+                setLogs(prev => {
+                    const existingTimestamps = new Set(prev.map(l => l.timestamp + l.message));
+                    const newLogs = backendLogs.filter(l => !existingTimestamps.has(l.timestamp + l.message));
+                    
+                    if (newLogs.length > 0) {
+                        // 합치고 시간순 정렬 후 최신 100개만 유지
+                        const combined = [...prev, ...newLogs]
+                            .sort((a, b) => a.timestamp.localeCompare(b.timestamp))
+                            .slice(-100);
+                        return combined;
                     }
+                    return prev;
                 });
-
-                // 종료된 시그널 감지
-                lastSignalIds.forEach(id => {
-                    if (!currentIds.has(id)) {
-                        addLog("SUCCESS", `✅ 시그널 종료: ${id.substring(0, 8)}...`);
-                    }
-                });
-
-                setLastSignalIds(currentIds);
             }
-
-            // 통계 업데이트
-            const statsRes = await api.getStats();
-            if (statsRes.success && statsRes.data) {
-                const stats = statsRes.data;
-                if (stats.active_signals > 0) {
-                    addLog("DEBUG", `활성 포지션: ${stats.active_signals}, 승률: ${stats.win_rate.toFixed(1)}%`);
-                }
-            }
-
         } catch (error) {
-            addLog("ERROR", `API 오류: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+            // 에러 시 조용히 무시
         }
-    }, [isPaused, lastSignalIds]);
+    }, [isPaused]);
 
-    // 로그 추가
+    // 로그 추가 (프론트엔드 이벤트용)
     const addLog = useCallback((level: LogEntry['level'], message: string, data?: any) => {
         setLogs(prev => {
             const newLog: LogEntry = {
                 timestamp: new Date().toISOString().slice(0, 19).replace('T', ' '),
                 level,
                 message,
-                data
+                data,
+                module: "frontend"
             };
             return [...prev.slice(-99), newLog]; // 최근 100개만 유지
         });
     }, []);
 
-    // 초기 로그
+    // 초기 로그 및 백엔드 로그 가져오기
     useEffect(() => {
         addLog("INFO", "🚀 BitQuant 대시보드 시작됨");
-        addLog("INFO", "백엔드 연결 중...");
-        
-        // 초기 연결 체크
-        api.health().then(res => {
-            if (res.success) {
-                addLog("SUCCESS", `✅ 백엔드 연결됨 (v${res.data?.version})`);
-            } else {
-                addLog("ERROR", "❌ 백엔드 연결 실패");
-            }
-        });
-    }, [addLog]);
+        fetchBackendLogs();
+    }, [addLog, fetchBackendLogs]);
 
-    // 주기적 업데이트
+    // 주기적 백엔드 로그 폴링
     useEffect(() => {
-        const interval = setInterval(checkForUpdates, 5000);
+        const interval = setInterval(fetchBackendLogs, 3000);
         return () => clearInterval(interval);
-    }, [checkForUpdates]);
+    }, [fetchBackendLogs]);
 
     // 자동 스크롤
     useEffect(() => {
@@ -147,16 +123,34 @@ export function LogViewer() {
         INFO: '정보',
         SUCCESS: '성공',
         WARN: '경고',
+        WARNING: '경고',
         ERROR: '오류',
-        DEBUG: '디버그',
-        SIGNAL: '시그널'
+        DEBUG: '디버그'
     };
 
+    // 로그 새로고침
+    const handleRefresh = useCallback(() => {
+        fetchBackendLogs();
+    }, [fetchBackendLogs]);
+
+    // 로그 초기화 (백엔드 + 프론트엔드)
+    const handleClearLogs = useCallback(async () => {
+        setLogs([]);
+        try {
+            await api.clearLogs();
+        } catch (e) {
+            // 에러 무시
+        }
+    }, []);
+
     return (
-        <div className="flex flex-col h-full">
+        <div className={cn("flex flex-col", compact ? "h-[300px]" : "h-full")}>
             {/* Header */}
-            <div className="flex justify-between items-center px-4 py-2 border-b border-slate-800">
-                <h3 className="font-semibold text-slate-100">실시간 로그</h3>
+            <div className="flex justify-between items-center px-4 py-2 border-b border-slate-800 bg-slate-900/50">
+                <h3 className="font-semibold text-slate-100 flex items-center gap-2">
+                    <Server className="w-4 h-4 text-green-400" />
+                    {compact ? "시스템 로그" : "실시간 로그"}
+                </h3>
                 <div className="flex items-center space-x-2">
                     <span className="text-xs text-slate-500 font-mono">
                         {isPaused ? "일시정지" : "실시간"}
@@ -170,24 +164,33 @@ export function LogViewer() {
                     </button>
                     <button
                         className="p-1 text-slate-400 hover:text-slate-200"
-                        onClick={() => setLogs([])}
+                        onClick={handleRefresh}
+                        title="새로고침"
+                    >
+                        <RefreshCw className="w-4 h-4" />
+                    </button>
+                    <button
+                        className="p-1 text-slate-400 hover:text-slate-200"
+                        onClick={handleClearLogs}
                         title="로그 지우기"
                     >
                         <Trash2 className="w-4 h-4" />
                     </button>
-                    <button
-                        className="p-1 text-slate-400 hover:text-slate-200"
-                        onClick={handleDownloadLogs}
-                        title="로그 다운로드"
-                    >
-                        <Download className="w-4 h-4" />
-                    </button>
+                    {!compact && (
+                        <button
+                            className="p-1 text-slate-400 hover:text-slate-200"
+                            onClick={handleDownloadLogs}
+                            title="로그 다운로드"
+                        >
+                            <Download className="w-4 h-4" />
+                        </button>
+                    )}
                 </div>
             </div>
 
             {/* Filter */}
-            <div className="px-4 py-2 border-b border-slate-800 flex gap-1 overflow-x-auto">
-                {['ALL', 'INFO', 'SUCCESS', 'SIGNAL', 'WARN', 'ERROR', 'DEBUG'].map(level => (
+            <div className="px-4 py-2 border-b border-slate-800 flex gap-1 overflow-x-auto bg-slate-900/30">
+                {['ALL', 'INFO', 'SUCCESS', 'WARN', 'ERROR', 'DEBUG'].map(level => (
                     <button
                         key={level}
                         className={cn(
@@ -215,10 +218,13 @@ export function LogViewer() {
                 ) : (
                     filteredLogs.map((log, i) => (
                         <div key={i} className="flex gap-2 hover:bg-slate-900/50 px-1 py-0.5 rounded">
-                            <span className="text-slate-600 flex-shrink-0">[{log.timestamp.split(' ')[1]}]</span>
-                            <span className={cn("flex-shrink-0 w-16", getLogLevelClass(log.level))}>
-                                {log.level}
+                            <span className="text-slate-600 flex-shrink-0">[{log.timestamp.split(' ')[1] || log.timestamp}]</span>
+                            <span className={cn("flex-shrink-0 w-14", getLogLevelClass(log.level))}>
+                                {log.level === "WARNING" ? "WARN" : log.level}
                             </span>
+                            {log.module && (
+                                <span className="text-slate-600 flex-shrink-0">[{log.module}]</span>
+                            )}
                             <span className="text-slate-300 break-all">{log.message}</span>
                         </div>
                     ))

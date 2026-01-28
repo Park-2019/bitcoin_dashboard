@@ -509,7 +509,25 @@ export const api = {
         total_usdt: number;
         summary: { trading_total: number; trading_available: number; funding_usdt: number };
     }>('/api/okx/all-balances'),
+
+    // ============== 로그 API ==============
+    
+    // 로그 조회
+    getLogs: (limit: number = 100, level?: string) => fetchApi<LogEntry[]>(
+        `/api/logs?limit=${limit}${level && level !== 'ALL' ? `&level=${level}` : ''}`
+    ),
+    
+    // 로그 초기화
+    clearLogs: () => fetchApi<{ message: string }>('/api/logs/clear', { method: 'POST' }),
 };
+
+// 로그 엔트리 인터페이스
+export interface LogEntry {
+    timestamp: string;
+    level: string;
+    message: string;
+    module?: string;
+}
 
 // 포트폴리오 상태 인터페이스
 export interface PortfolioStatus {
