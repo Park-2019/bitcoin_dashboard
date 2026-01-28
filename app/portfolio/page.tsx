@@ -392,6 +392,7 @@ export default function PortfolioPage() {
                             onSymbolChange={(symbol) => setSelectedSymbol(symbol)}
                             positionInfo={selectedPosition || undefined}
                             compact={true}
+                            hideControls={true}
                         />
                     </div>
                 )}
@@ -453,19 +454,18 @@ export default function PortfolioPage() {
                                 </div>
                             </div>
                         ) : (
-                            <div className="overflow-x-auto">
+                            <div className="overflow-auto max-h-[400px]">
                                 <table className="w-full text-sm">
-                                    <thead className="bg-slate-800/50">
+                                    <thead className="bg-slate-800 sticky top-0 z-10">
                                         <tr>
-                                            <th className="text-left px-4 py-3 text-slate-400 font-medium">심볼</th>
-                                            <th className="text-center px-3 py-3 text-slate-400 font-medium">방향</th>
-                                            <th className="text-center px-3 py-3 text-slate-400 font-medium">점수</th>
-                                            <th className="text-right px-3 py-3 text-slate-400 font-medium">크기</th>
-                                            <th className="text-right px-3 py-3 text-slate-400 font-medium">진입가</th>
-                                            <th className="text-right px-3 py-3 text-slate-400 font-medium">현재가</th>
-                                            <th className="text-right px-3 py-3 text-slate-400 font-medium">손익</th>
-                                            <th className="text-right px-3 py-3 text-slate-400 font-medium">수익률</th>
-                                            <th className="text-right px-4 py-3 text-slate-400 font-medium">청산가</th>
+                                            <th className="text-left px-4 py-2 text-slate-400 font-medium text-xs">심볼</th>
+                                            <th className="text-center px-2 py-2 text-slate-400 font-medium text-xs">방향</th>
+                                            <th className="text-center px-2 py-2 text-slate-400 font-medium text-xs">점수</th>
+                                            <th className="text-right px-2 py-2 text-slate-400 font-medium text-xs">크기</th>
+                                            <th className="text-right px-2 py-2 text-slate-400 font-medium text-xs">진입가</th>
+                                            <th className="text-right px-2 py-2 text-slate-400 font-medium text-xs">현재가</th>
+                                            <th className="text-right px-2 py-2 text-slate-400 font-medium text-xs">손익</th>
+                                            <th className="text-right px-2 py-2 text-slate-400 font-medium text-xs">수익률</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-800/50">
@@ -483,79 +483,62 @@ export default function PortfolioPage() {
                                                     )}
                                                     onClick={() => setSelectedSymbol(symbol)}
                                                 >
-                                                    <td className="px-4 py-3">
+                                                    <td className="px-4 py-2">
                                                         <div className="flex items-center gap-2">
                                                             <div className={cn("w-2 h-2 rounded-full", colors[idx % colors.length])} />
-                                                            <span className="font-bold text-white hover:text-green-400 transition-colors">{symbol}</span>
-                                                            <span className="text-xs text-slate-500">{pos.leverage}x</span>
-                                                            <LineChart className="w-3 h-3 text-slate-600" />
+                                                            <span className="font-bold text-white hover:text-green-400 transition-colors text-sm">{symbol}</span>
+                                                            <span className="text-[10px] text-slate-500">{pos.leverage}x</span>
                                                         </div>
                                                     </td>
-                                                    <td className="px-3 py-3 text-center">
+                                                    <td className="px-2 py-2 text-center">
                                                         <span className={cn(
-                                                            "inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-bold",
+                                                            "inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold",
                                                             pos.side === "long" 
                                                                 ? "bg-green-500/20 text-green-400" 
                                                                 : "bg-red-500/20 text-red-400"
                                                         )}>
-                                                            {pos.side === "long" ? (
-                                                                <><TrendingUp className="w-3 h-3" /> 롱</>
-                                                            ) : (
-                                                                <><TrendingDown className="w-3 h-3" /> 숏</>
-                                                            )}
+                                                            {pos.side === "long" ? "롱" : "숏"}
                                                         </span>
                                                     </td>
-                                                    <td className="px-3 py-3 text-center">
+                                                    <td className="px-2 py-2 text-center">
                                                         {pos.entry_score ? (
-                                                            <div className="flex flex-col items-center gap-0.5">
-                                                                <span className={cn(
-                                                                    "inline-flex items-center justify-center w-10 h-6 rounded text-xs font-bold",
-                                                                    pos.entry_score >= 80 
-                                                                        ? "bg-green-500/20 text-green-400" 
-                                                                        : pos.entry_score >= 60
-                                                                        ? "bg-amber-500/20 text-amber-400"
-                                                                        : pos.entry_score >= 40
-                                                                        ? "bg-orange-500/20 text-orange-400"
-                                                                        : "bg-red-500/20 text-red-400"
-                                                                )}>
-                                                                    {pos.entry_score}
-                                                                </span>
-                                                                {pos.market_phase && (
-                                                                    <span className="text-[10px] text-slate-500 truncate max-w-[60px]">
-                                                                        {pos.market_phase}
-                                                                    </span>
-                                                                )}
-                                                            </div>
+                                                            <span className={cn(
+                                                                "inline-flex items-center justify-center px-1.5 py-0.5 rounded text-[10px] font-bold",
+                                                                pos.entry_score >= 80 
+                                                                    ? "bg-green-500/20 text-green-400" 
+                                                                    : pos.entry_score >= 60
+                                                                    ? "bg-amber-500/20 text-amber-400"
+                                                                    : "bg-orange-500/20 text-orange-400"
+                                                            )}>
+                                                                {Math.round(pos.entry_score)}
+                                                            </span>
                                                         ) : (
-                                                            <span className="text-slate-600">-</span>
+                                                            <span className="text-slate-600 text-xs">-</span>
                                                         )}
                                                     </td>
-                                                    <td className="px-3 py-3 text-right font-mono text-slate-300">
+                                                    <td className="px-2 py-2 text-right font-mono text-slate-300 text-xs">
                                                         {pos.size}
                                                     </td>
-                                                    <td className="px-3 py-3 text-right font-mono text-slate-400 text-xs">
+                                                    <td className="px-2 py-2 text-right font-mono text-slate-400 text-[10px]">
                                                         ${pos.entry_price.toFixed(4)}
                                                     </td>
                                                     <td className={cn(
-                                                        "px-3 py-3 text-right font-mono text-xs",
+                                                        "px-2 py-2 text-right font-mono text-[10px]",
                                                         isProfit ? "text-green-400" : pos.pnl < 0 ? "text-red-400" : "text-slate-400"
                                                     )}>
                                                         ${pos.mark_price.toFixed(4)}
                                                     </td>
                                                     <td className={cn(
-                                                        "px-3 py-3 text-right font-mono font-bold",
+                                                        "px-2 py-2 text-right font-mono font-bold text-xs",
                                                         isProfit ? "text-green-400" : pos.pnl < 0 ? "text-red-400" : "text-slate-400"
                                                     )}>
                                                         {isProfit ? "+" : ""}${pos.pnl.toFixed(2)}
                                                     </td>
                                                     <td className={cn(
-                                                        "px-3 py-3 text-right font-mono font-bold",
+                                                        "px-2 py-2 text-right font-mono font-bold text-xs",
                                                         isProfit ? "text-green-400" : pos.pnl < 0 ? "text-red-400" : "text-slate-400"
                                                     )}>
                                                         {isProfit ? "+" : ""}{pos.pnl_percent.toFixed(2)}%
-                                                    </td>
-                                                    <td className="px-4 py-3 text-right font-mono text-amber-400 text-xs">
-                                                        ${pos.liq_price?.toFixed(4) ?? "-"}
                                                     </td>
                                                 </tr>
                                             );

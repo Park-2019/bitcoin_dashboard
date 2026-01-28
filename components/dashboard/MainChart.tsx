@@ -26,9 +26,10 @@ interface MainChartProps {
     onSymbolChange?: (symbol: string) => void;
     positionInfo?: PositionInfo;
     compact?: boolean;  // 컴팩트 모드 (포트폴리오용)
+    hideControls?: boolean;  // 컨트롤 숨김 (심볼선택, 지표 등)
 }
 
-export function MainChart({ selectedSymbol, onSymbolChange, positionInfo, compact = false }: MainChartProps) {
+export function MainChart({ selectedSymbol, onSymbolChange, positionInfo, compact = false, hideControls = false }: MainChartProps) {
     const chartContainerRef = useRef<HTMLDivElement>(null);
     const chartRef = useRef<IChartApi | null>(null);
     const candleSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
@@ -351,8 +352,9 @@ export function MainChart({ selectedSymbol, onSymbolChange, positionInfo, compac
     }, [fetchAnalysis]);
 
     return (
-        <div className="bg-slate-900 border border-slate-800 rounded-lg flex flex-col">
-            {/* Header */}
+        <div className={cn("bg-slate-900 flex flex-col", !hideControls && "border border-slate-800 rounded-lg")}>
+            {/* Header - 컨트롤 모드에서만 표시 */}
+            {!hideControls && (
             <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 border-b border-slate-800">
                 <div className="flex items-center gap-3">
                     {/* Pair Selector */}
@@ -429,9 +431,10 @@ export function MainChart({ selectedSymbol, onSymbolChange, positionInfo, compac
                     </button>
                 </div>
             </div>
+            )}
 
-            {/* Analysis Summary (if available) */}
-            {analysis && (
+            {/* Analysis Summary - 컨트롤 모드에서만 표시 */}
+            {!hideControls && analysis && (
                 <div className="flex items-center gap-4 px-4 py-2 border-b border-slate-800 text-xs bg-slate-800/30">
                     <div className="flex items-center gap-1">
                         <span className="text-slate-500">현재가:</span>
@@ -488,43 +491,60 @@ export function MainChart({ selectedSymbol, onSymbolChange, positionInfo, compac
             {/* Chart */}
             <div ref={chartContainerRef} className={cn("w-full", compact ? "h-[250px]" : "h-[350px]")} />
 
-            {/* Legend */}
-            <div className="flex items-center justify-center gap-3 px-3 py-1 border-t border-slate-800 text-[10px]">
-                {positionInfo && (
-                    <>
-                        <div className="flex items-center gap-1">
-                            <div className="w-3 h-0.5 bg-yellow-500 rounded" />
-                            <span className="text-yellow-500">진입</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                            <div className="w-3 h-0.5 bg-red-500 rounded border-dashed" />
-                            <span className="text-red-400">SL</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                            <div className="w-3 h-0.5 bg-green-500 rounded border-dashed" />
-                            <span className="text-green-400">TP</span>
-                        </div>
-                        <div className="text-slate-700">|</div>
-                    </>
-                )}
-                <div className="flex items-center gap-1">
-                    <div className="w-0 h-0 border-l-[4px] border-r-[4px] border-b-[6px] border-l-transparent border-r-transparent border-b-green-500" />
-                    <span className="text-slate-500">매수</span>
+            {/* Legend - 간소화된 버전 (hideControls) 또는 전체 버전 */}
+            {hideControls ? (
+                <div className="flex items-center justify-center gap-4 px-3 py-1.5 text-[10px] bg-slate-800/30">
+                    <div className="flex items-center gap-1">
+                        <div className="w-3 h-0.5 bg-yellow-500 rounded" />
+                        <span className="text-yellow-500 font-medium">진입</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                        <div className="w-3 h-0.5 bg-red-500 rounded" style={{borderStyle: 'dashed'}} />
+                        <span className="text-red-400 font-medium">SL</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                        <div className="w-3 h-0.5 bg-green-500 rounded" style={{borderStyle: 'dashed'}} />
+                        <span className="text-green-400 font-medium">TP</span>
+                    </div>
                 </div>
-                <div className="flex items-center gap-1">
-                    <div className="w-0 h-0 border-l-[4px] border-r-[4px] border-t-[6px] border-l-transparent border-r-transparent border-t-red-500" />
-                    <span className="text-slate-500">매도</span>
+            ) : (
+                <div className="flex items-center justify-center gap-3 px-3 py-1 border-t border-slate-800 text-[10px]">
+                    {positionInfo && (
+                        <>
+                            <div className="flex items-center gap-1">
+                                <div className="w-3 h-0.5 bg-yellow-500 rounded" />
+                                <span className="text-yellow-500">진입</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                                <div className="w-3 h-0.5 bg-red-500 rounded border-dashed" />
+                                <span className="text-red-400">SL</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                                <div className="w-3 h-0.5 bg-green-500 rounded border-dashed" />
+                                <span className="text-green-400">TP</span>
+                            </div>
+                            <div className="text-slate-700">|</div>
+                        </>
+                    )}
+                    <div className="flex items-center gap-1">
+                        <div className="w-0 h-0 border-l-[4px] border-r-[4px] border-b-[6px] border-l-transparent border-r-transparent border-b-green-500" />
+                        <span className="text-slate-500">매수</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                        <div className="w-0 h-0 border-l-[4px] border-r-[4px] border-t-[6px] border-l-transparent border-r-transparent border-t-red-500" />
+                        <span className="text-slate-500">매도</span>
+                    </div>
+                    <div className="text-slate-700">|</div>
+                    <div className="flex items-center gap-1">
+                        <div className="w-2.5 h-0.5 bg-green-500 rounded" />
+                        <span className="text-slate-500">MA20</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                        <div className="w-2.5 h-0.5 bg-purple-500 rounded" />
+                        <span className="text-slate-500">BB</span>
+                    </div>
                 </div>
-                <div className="text-slate-700">|</div>
-                <div className="flex items-center gap-1">
-                    <div className="w-2.5 h-0.5 bg-green-500 rounded" />
-                    <span className="text-slate-500">MA20</span>
-                </div>
-                <div className="flex items-center gap-1">
-                    <div className="w-2.5 h-0.5 bg-purple-500 rounded" />
-                    <span className="text-slate-500">BB</span>
-                </div>
-            </div>
+            )}
         </div>
     );
 }
